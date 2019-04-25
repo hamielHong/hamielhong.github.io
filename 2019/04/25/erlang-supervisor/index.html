@@ -1,0 +1,177 @@
+<!DOCTYPE html><html><head><meta name="generator" content="Hexo 3.8.0"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><meta name="author" content="Hamiel Hong"><meta name="renderer" content="webkit"><meta name="copyright" content="Hamiel Hong"><meta name="keywords" content="Hexo"><meta name="description" content="null"><meta name="Cache-Control" content="no-cache"><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><title>erlang-supervisor · Hamiel's Blog</title><link rel="stylesheet" href="/css/style.css?v=2018.7.9"><link rel="stylesheet" href="/css/animation.css?v=2018.7.9"><link rel="icon" href="/img/assets/aomine_favicon.ico"><link rel="stylesheet" href="https://cdn.bootcss.com/font-awesome/4.7.0/css/font-awesome.min.css?version=1.5.6"><!-- scripts--><script>(function( w ){
+  "use strict";
+  // rel=preload support test
+  if( !w.loadCSS ){
+    w.loadCSS = function(){};
+  }
+  // define on the loadCSS obj
+  var rp = loadCSS.relpreload = {};
+  // rel=preload feature support test
+  // runs once and returns a function for compat purposes
+  rp.support = (function(){
+    var ret;
+    try {
+      ret = w.document.createElement( "link" ).relList.supports( "preload" );
+    } catch (e) {
+      ret = false;
+    }
+    return function(){
+      return ret;
+    };
+  })();
+
+  // if preload isn't supported, get an asynchronous load by using a non-matching media attribute
+  // then change that media back to its intended value on load
+  rp.bindMediaToggle = function( link ){
+    // remember existing media attr for ultimate state, or default to 'all'
+    var finalMedia = link.media || "all";
+
+    function enableStylesheet(){
+      link.media = finalMedia;
+    }
+
+    // bind load handlers to enable media
+    if( link.addEventListener ){
+      link.addEventListener( "load", enableStylesheet );
+    } else if( link.attachEvent ){
+      link.attachEvent( "onload", enableStylesheet );
+    }
+
+    // Set rel and non-applicable media type to start an async request
+    // note: timeout allows this to happen async to let rendering continue in IE
+    setTimeout(function(){
+      link.rel = "stylesheet";
+      link.media = "only x";
+    });
+    // also enable media after 3 seconds,
+    // which will catch very old browsers (android 2.x, old firefox) that don't support onload on link
+    setTimeout( enableStylesheet, 3000 );
+  };
+
+  // loop through link elements in DOM
+  rp.poly = function(){
+    // double check this to prevent external calls from running
+    if( rp.support() ){
+      return;
+    }
+    var links = w.document.getElementsByTagName( "link" );
+    for( var i = 0; i < links.length; i++ ){
+      var link = links[ i ];
+      // qualify links to those with rel=preload and as=style attrs
+      if( link.rel === "preload" && link.getAttribute( "as" ) === "style" && !link.getAttribute( "data-loadcss" ) ){
+        // prevent rerunning on link
+        link.setAttribute( "data-loadcss", true );
+        // bind listeners to toggle media back
+        rp.bindMediaToggle( link );
+      }
+    }
+  };
+
+  // if unsupported, run the polyfill
+  if( !rp.support() ){
+    // run once at least
+    rp.poly();
+
+    // rerun poly on an interval until onload
+    var run = w.setInterval( rp.poly, 500 );
+    if( w.addEventListener ){
+      w.addEventListener( "load", function(){
+        rp.poly();
+        w.clearInterval( run );
+      } );
+    } else if( w.attachEvent ){
+      w.attachEvent( "onload", function(){
+        rp.poly();
+        w.clearInterval( run );
+      } );
+    }
+  }
+
+
+  // commonjs
+  if( typeof exports !== "undefined" ){
+    exports.loadCSS = loadCSS;
+  }
+  else {
+    w.loadCSS = loadCSS;
+  }
+}( typeof global !== "undefined" ? global : this ) );</script><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js" defer></script><script src="/js/main.js?v=2018.7.9" defer></script><!-- fancybox--><link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.2.5/jquery.fancybox.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'"><script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.2.5/jquery.fancybox.min.js" defer></script><!-- busuanzi--><script async src="//dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script></head><body><section class="profile-close" id="cxo-profile"><div class="profile-avatar"><i class="fa fa-caret-left"></i><img src="/img/assets/aomine.jpg"></div><!--.profile-saying
+  i.fa.fa-comment
+  .saying--><div class="cxo-profile-inner"><div class="profile-name">Hamiel Hong</div><div class="profile-signature">Be water my friend</div><div class="read-progress"></div></div></section><header id="cxo-intro" style="height: 70vh;background-image: url(/img/intro/index-bg.png);"><nav id="cxo-intro-nav"><section><div class="intro-nav-title"><a href="/">Hamiel's Blog</a></div><div class="intro-nav-label-box"><a href="/">Home</a><a href="/about/">About</a><a href="/archives/">Archives</a><a href="/tags/">Tags</a></div><i class="fa fa-bars intro-nav-menu"><div class="intro-nav-drop"><a href="/">Home</a><a href="/about/">About</a><a href="/archives/">Archives</a><a href="/tags/">Tags</a></div></i><div class="clear"></div></section></nav><h1 class="post-title">erlang-supervisor</h1><div class="post-intros"><div class="post-intro-meta"><span class="post-intro-time"><i class="post-intro-calendar fa fa-calendar"></i><span>2019-04-25</span></span><span class="post-intro-tags"><a class="intro-tag fa fa-tag" href="javascript:void(0)" date-tags="erlang"> erlang</a></span></div></div></header><article class="cxo-up" id="cxo-content-outer"><section id="cxo-content-inner"><article class="article-entry" id="post"><h2 id="erlang学习笔记－supervisor-行为模式"><a href="#erlang学习笔记－supervisor-行为模式" class="headerlink" title="erlang学习笔记－supervisor 行为模式"></a>erlang学习笔记－supervisor 行为模式</h2><p>这一篇以开源项目cowboy中的顶层监督者cowboy_sup为例子解释supervisor中的一些细节</p>
+<p>有些内容收集自网上，具体出处我也忘了，如有雷同，纯属我抄你…</p>
+<p>cowboy_sup.erl</p>
+<figure class="highlight erlang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">-module</span><span class="params">(cowboy_sup)</span>.</span><br><span class="line"><span class="keyword">-behaviour</span><span class="params">(supervisor)</span>.</span><br><span class="line"></span><br><span class="line"><span class="keyword">-export</span><span class="params">([start_link/<span class="number">0</span>])</span>.</span><br><span class="line"><span class="keyword">-export</span><span class="params">([init/<span class="number">1</span>])</span>.</span><br><span class="line"></span><br><span class="line"><span class="keyword">-spec</span> start_link<span class="params">()</span> -&gt; &#123;ok, pid<span class="params">()</span>&#125;.</span><br><span class="line"><span class="function"><span class="title">start_link</span><span class="params">()</span> -&gt;</span></span><br><span class="line">    supervisor:start_link(&#123;local, ?MODULE&#125;, ?MODULE, []).</span><br><span class="line"></span><br><span class="line"><span class="keyword">-spec</span> init<span class="params">([])</span></span><br><span class="line">    -&gt; &#123;ok, &#123;&#123;supervisor:strategy<span class="params">()</span>, 10, 10&#125;, [supervisor:child_spec<span class="params">()</span>]&#125;&#125;.</span><br><span class="line"><span class="function"><span class="title">init</span><span class="params">([])</span> -&gt;</span></span><br><span class="line">    Procs = [&#123;cowboy_clock, &#123;cowboy_clock, start_link, []&#125;,</span><br><span class="line">        permanent, <span class="number">5000</span>, worker, [cowboy_clock]&#125;],</span><br><span class="line">    &#123;ok, &#123;&#123;one_for_one, <span class="number">10</span>, <span class="number">10</span>&#125;, Procs&#125;&#125;.</span><br></pre></td></tr></table></figure>
+<p>这个模块就是otp中一大行为模式—— supervisor （监督者）的实现，看下 supervisor 的简单介绍(摘抄自Erlang设计原则)：</p>
+<blockquote>
+<p>督程负责启动、停止和监视它的子进程。督程的基本思想是它要保持它的子进程有效，必要的时候可以重启他们。<br>要启动和监视的子进程由一个 子进程规格 的列表来指定。子进程按照在这个列表中的顺序启动，并且按照相反的顺序终止。</p>
+</blockquote>
+<p>当我们调用 supervisor:start_link({local, ?MODULE}, ?MODULE, []). 这个进程会回调自己的 init/1 方法进行进程的初始化，init/1 需要返回一个元组作为初始化的参数，这里对返回的元组中一些字段解释一下：</p>
+<figure class="highlight erlang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">%% 返回元组格式</span></span><br><span class="line">&#123;ok, &#123;SupFlags, ChildSpec&#125;&#125;</span><br><span class="line"></span><br><span class="line">SupFlags = &#123;Strategy, Intensity, Period&#125;</span><br><span class="line"></span><br><span class="line">Strategy = one_for_one | one_for_all | rest_for_one |simple_one_for_one</span><br><span class="line">Intensity = integer() &gt;= <span class="number">0</span></span><br><span class="line">Period = integer() &gt;= <span class="number">1</span></span><br><span class="line"></span><br><span class="line">ChildSpec = &#123;Id, StartFunc, Restart, Shutdown, Type, Modules&#125;</span><br><span class="line"></span><br><span class="line">Id = term()</span><br><span class="line">StartFunc = &#123;M, F, A&#125;</span><br><span class="line">    M = F = atom()</span><br><span class="line">    A = [term()]</span><br><span class="line">Restart = permanent | transient | temporary</span><br><span class="line">Shutdown = brutal_kill | integer() &gt;=<span class="number">0</span> | infinity</span><br><span class="line">Type = worker | supervisor</span><br><span class="line">Modules = [Module] | dynamic</span><br><span class="line">Module = atom()</span><br></pre></td></tr></table></figure>
+<p>SupFlags 进程策略：</p>
+<ul>
+<li><p>Strategy 重启模式</p>
+<ul>
+<li>one_for_one 如果子进程终止，只有这个进程会被重启</li>
+<li>one_for_all 如果子进程终止，所有子进程都会被重启</li>
+<li>rest_for_one 如果子进程终止，在这个进程重启后，其他所有子进程会被重启</li>
+<li>simple_one_for_one 简化one_for_one，所有子进程都动态添加同一种进程的实例</li>
+<li>one_for_one 和 simple_one_for_one 最大的区别在于：one_for_one 用一个列表储存了所有要启动的子进程，并按顺序启动。而simple_one_for_one 用一个进程字典定义所有子进程。所以当一个监督者拥有很多子进程时，遇到进程崩溃，simple_one_for_one 效率会快很多</li>
+</ul>
+</li>
+<li><p>Intensity 最多允许重启次数 0表示不重启</p>
+</li>
+<li><p>Period 限定重启时间，单位：s（秒）</p>
+</li>
+<li><p>结合起来看就是，在多长时间内（Period）最多允许重启几次（Intensity），重启的方式为（Strategy），Period 和 Intensity 的设定意义在于限制最大重启频率，这是为了避免反复重启进入死循环。</p>
+</li>
+</ul>
+<p>Procs 子进程相关：</p>
+<ul>
+<li><p>Id 是督程内部用于标识子进程规范的名称。</p>
+</li>
+<li><p>StartFunc 定义了用于启动子进程的很难书调用。它是一个模块.函数.参数的元组，与 apply(M, F, A) 用的一样。</p>
+</li>
+<li><p>Restart定义了一个被终止的子进程要在何时被重启：</p>
+<ul>
+<li>permanent 子进程总会被重启。</li>
+<li>temporary 子进程从不会被重启。</li>
+<li>transient 子进程只有当其被异常终止时才会被重启，即，退出理由不是 normal 。</li>
+</ul>
+</li>
+<li><p>Shutdown定义了一个子进程应如何被终止。</p>
+<ul>
+<li>brutal_kill 表示子进程应使用 exit(Child, kill) 进行无条件终止。</li>
+<li>integer() &gt;=0 一个整数超时值表示督程先通过调用 exit(Child, shutdown) 告诉子进程要终止了，然后等待其返回退出信号。如果在指定的事件内没有接受到任何退出信号，那么使用 exit(Child, kill) 无条件终止子进程。</li>
+<li>infinity 如果子进程是另外一个督程，那么应该设置为 infinity 以给予子树足够的时间关闭。</li>
+</ul>
+</li>
+<li><p>Type 指定子进程是督程还是佣程。</p>
+</li>
+<li><p>Modules 应该为只有一个元素的列表 [Module]，其中 Module 是回调模块的名称，如果子进程是督程、gen_server或者gen_fsm。如果子进程是一个gen_event，那么 Modules 应为 dynamic 。 在升级和降级过程中发布处理器将用到这个信息。</p>
+</li>
+</ul>
+<p>结合上面的解释，我们就可以理解 cowboy_sup.erl 中 init/1 方法中代码的意思了：</p>
+<figure class="highlight erlang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Procs = [&#123;cowboy_clock, &#123;cowboy_clock, start_link, []&#125;,</span><br><span class="line">    permanent, <span class="number">5000</span>, worker, [cowboy_clock]&#125;],</span><br><span class="line">&#123;ok, &#123;&#123;one_for_one, <span class="number">10</span>, <span class="number">10</span>&#125;, Procs&#125;&#125;.</span><br></pre></td></tr></table></figure>
+<p>表示这个cowboy_sup监控树下，会启动一个 cowboy_clock 模块，启动的模式是 permanent 即总会重启，强制结束的等待时间设置为5000，worker表示启动的子进程是一个佣程</p>
+<p>重启的策略是 one_for_one 一对一模式，并且在 10s 中最多允许重启 10 次</p>
+<p>最后再说明一下Modules：</p>
+<ul>
+<li><p>Modules 是进程依赖的模块,这个信息只有在代码热更新的时候才会被用到:标注了哪些模块需要按照什么顺序进行更新;通常这里只需要列出进程依赖的主模块.</p>
+</li>
+<li><p>如果子进程是supervisor gen_server gen_fsm Module名是回调模块的名称,这时Modules的值是只有一个元素的列表,元素就是回调模块的名称;</p>
+</li>
+<li><p>如果子进程是gen_event Modules的值是 dynamic;</p>
+</li>
+<li><p>关于dynamic参数余锋有一篇专门的分析: <a href="http://blog.yufeng.info/archives/1455" target="_blank" rel="noopener">Erlang supervisor规格的dynamic行为分析</a></p>
+</li>
+</ul>
+</article><!-- lincense--><div class="license-wrapper"><p> <span>Author:  </span><a href="https://hamielhong.github.io">Hamiel Hong</a></p><p> <span>Link:  </span><a href="https://hamielhong.github.io/2019/04/25/erlang-supervisor/">https://hamielhong.github.io/2019/04/25/erlang-supervisor/</a></p><p> <span>Copyright:  </span><span>All articles in this blog are licensed under <a rel="license" href="https://creativecommons.org/licenses/by-nc-nd/3.0">CC BY-NC-SA 3.0</a> unless stating additionally.</span></p></div><div class="post-paginator"><a class="nextSlogan" href="/2019/04/23/hello-world/" title="万万没想到"><span>NextPost ></span><br><span class="nextTitle">万万没想到</span></a><div class="clear"></div></div><div id="comment"><div id="container"></div><link rel="stylesheet" href="https://imsun.github.io/gitment/style/default.css"><script src="https://imsun.github.io/gitment/dist/gitment.browser.js"></script><script>var gitment = new Gitment({
+  id: 'erlang-supervisor',
+  owner: 'hamielHong',
+  repo: 'hamielhong.github.io',
+  oauth: {
+    client_id: '51ed355b2925b02b6330',
+    client_secret: '3b05555fd89b0bdc097c11b5d588d5985e4fb80f',
+  },
+})
+gitment.render('container')</script></div></section></article><footer id="cxo-footer-outer"><div id="cxo-footer-inner"><p class="footer-container"><span>Site by </span><a href="http://hexo.io"><span>Hexo</span></a><span> | theme </span><a href="https://github.com/Longlongyu/hexo-theme-Cxo"><span>Cxo</span></a></p><i class="fa fa-user"> </i><span id="busuanzi_value_site_uv"></span><span> | </span><i class="fa fa-eye"> </i><span id="busuanzi_value_site_pv"></span></div></footer><!-- catelog--><div class="toc-wrapper" style="top: 70vh;"><div class="toc-catalog"><i class="fa fa-list"> </i><span>CATALOG</span></div><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#erlang学习笔记－supervisor-行为模式"><span class="toc-number">1.</span> <span class="toc-text">erlang学习笔记－supervisor 行为模式</span></a></li></ol></div><!-- top--><i class="fa fa-arrow-up close" id="go-up" aria-hidden="true"></i></body></html>
