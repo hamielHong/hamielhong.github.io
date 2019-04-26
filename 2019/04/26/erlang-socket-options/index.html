@@ -1,0 +1,132 @@
+<!DOCTYPE html><html><head><meta name="generator" content="Hexo 3.8.0"><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><meta name="author" content="Hamiel Hong"><meta name="renderer" content="webkit"><meta name="copyright" content="Hamiel Hong"><meta name="keywords" content="Hexo"><meta name="description" content="null"><meta name="Cache-Control" content="no-cache"><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"><title>erlang tcp中的socket参数设置 · Hamiel's Blog</title><link rel="stylesheet" href="/css/style.css?v=2018.7.9"><link rel="stylesheet" href="/css/animation.css?v=2018.7.9"><link rel="icon" href="/img/assets/aomine_favicon.ico"><link rel="stylesheet" href="https://cdn.bootcss.com/font-awesome/4.7.0/css/font-awesome.min.css?version=1.5.6"><!-- scripts--><script>(function( w ){
+  "use strict";
+  // rel=preload support test
+  if( !w.loadCSS ){
+    w.loadCSS = function(){};
+  }
+  // define on the loadCSS obj
+  var rp = loadCSS.relpreload = {};
+  // rel=preload feature support test
+  // runs once and returns a function for compat purposes
+  rp.support = (function(){
+    var ret;
+    try {
+      ret = w.document.createElement( "link" ).relList.supports( "preload" );
+    } catch (e) {
+      ret = false;
+    }
+    return function(){
+      return ret;
+    };
+  })();
+
+  // if preload isn't supported, get an asynchronous load by using a non-matching media attribute
+  // then change that media back to its intended value on load
+  rp.bindMediaToggle = function( link ){
+    // remember existing media attr for ultimate state, or default to 'all'
+    var finalMedia = link.media || "all";
+
+    function enableStylesheet(){
+      link.media = finalMedia;
+    }
+
+    // bind load handlers to enable media
+    if( link.addEventListener ){
+      link.addEventListener( "load", enableStylesheet );
+    } else if( link.attachEvent ){
+      link.attachEvent( "onload", enableStylesheet );
+    }
+
+    // Set rel and non-applicable media type to start an async request
+    // note: timeout allows this to happen async to let rendering continue in IE
+    setTimeout(function(){
+      link.rel = "stylesheet";
+      link.media = "only x";
+    });
+    // also enable media after 3 seconds,
+    // which will catch very old browsers (android 2.x, old firefox) that don't support onload on link
+    setTimeout( enableStylesheet, 3000 );
+  };
+
+  // loop through link elements in DOM
+  rp.poly = function(){
+    // double check this to prevent external calls from running
+    if( rp.support() ){
+      return;
+    }
+    var links = w.document.getElementsByTagName( "link" );
+    for( var i = 0; i < links.length; i++ ){
+      var link = links[ i ];
+      // qualify links to those with rel=preload and as=style attrs
+      if( link.rel === "preload" && link.getAttribute( "as" ) === "style" && !link.getAttribute( "data-loadcss" ) ){
+        // prevent rerunning on link
+        link.setAttribute( "data-loadcss", true );
+        // bind listeners to toggle media back
+        rp.bindMediaToggle( link );
+      }
+    }
+  };
+
+  // if unsupported, run the polyfill
+  if( !rp.support() ){
+    // run once at least
+    rp.poly();
+
+    // rerun poly on an interval until onload
+    var run = w.setInterval( rp.poly, 500 );
+    if( w.addEventListener ){
+      w.addEventListener( "load", function(){
+        rp.poly();
+        w.clearInterval( run );
+      } );
+    } else if( w.attachEvent ){
+      w.attachEvent( "onload", function(){
+        rp.poly();
+        w.clearInterval( run );
+      } );
+    }
+  }
+
+
+  // commonjs
+  if( typeof exports !== "undefined" ){
+    exports.loadCSS = loadCSS;
+  }
+  else {
+    w.loadCSS = loadCSS;
+  }
+}( typeof global !== "undefined" ? global : this ) );</script><script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js" defer></script><script src="/js/main.js?v=2018.7.9" defer></script><!-- fancybox--><link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.2.5/jquery.fancybox.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'"><script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.2.5/jquery.fancybox.min.js" defer></script><!-- busuanzi--><script async src="//dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script></head><body><section class="profile-close" id="cxo-profile"><div class="profile-avatar"><i class="fa fa-caret-left"></i><img src="/img/assets/aomine.jpg"></div><!--.profile-saying
+  i.fa.fa-comment
+  .saying--><div class="cxo-profile-inner"><div class="profile-name">Hamiel Hong</div><div class="profile-signature">Be water my friend</div><div class="read-progress"></div></div></section><header id="cxo-intro" style="height: 70vh;background-image: url(/img/intro/index-bg.png);"><nav id="cxo-intro-nav"><section><div class="intro-nav-title"><a href="/">Hamiel's Blog</a></div><div class="intro-nav-label-box"><a href="/">Home</a><a href="/about/">About</a><a href="/archives/">Archives</a><a href="/tags/">Tags</a></div><i class="fa fa-bars intro-nav-menu"><div class="intro-nav-drop"><a href="/">Home</a><a href="/about/">About</a><a href="/archives/">Archives</a><a href="/tags/">Tags</a></div></i><div class="clear"></div></section></nav><h1 class="post-title">erlang tcp中的socket参数设置</h1><div class="post-intros"><div class="post-intro-meta"><span class="post-intro-time"><i class="post-intro-calendar fa fa-calendar"></i><span>2019-04-26</span></span><span class="post-intro-tags"><a class="intro-tag fa fa-tag" href="javascript:void(0)" date-tags="erlang"> erlang</a></span></div></div></header><article class="cxo-up" id="cxo-content-outer"><section id="cxo-content-inner"><article class="article-entry" id="post"><p>Erlang的inet模块里提供了对Socket进行一系列参数设置的接口 setopts(Socket, Options)。可设置的参数目前有32个(R22)。以下是对几个常用参数的设置做的记录，不定期补充。<a id="more"></a></p>
+<p><code>binary</code></p>
+<p>通常我们都指定以二进制的形式来处理Packet的数据。</p>
+<p><code>{packet, PacketType}</code><br><br><code>PacketType : 0 | 1 | 2 | 4 | raw | sunrm | asn1 | cdr | fcgi | line | tpkt | http | httph | http_bin | httph_bin</code></p>
+<p>指定Packet的header大小或者类型，需要根据应用情况明确指定，自己处理协议头则设置为0。</p>
+<p><code>{active, true | false | once | -32768..32767}</code></p>
+<p>默认值是true。但是由于设置为true的情况下是没有flow control的，所以一般不会使用这个默认值。false的需要每次通过代码精确指定消息数据的接收，视需要而定。通常once是比较常用的设置。</p>
+<p>{active,N} 可以看作是对 {active,once} 的一个升级</p>
+<blockquote><p>我们知道，{active,once}在每次接收到包都要重新设置active选项，才能继续接收erlang的消息通知。实际上，每次设定{active,once}都意味着调用一次epoll_ctl， 如果请求过于频繁，就会有大量的epoll_ctl调用。erlang目前只有一个线程会收割epoll_wait事件，epoll_wait要轮询已经就绪的ctl队列，如果大量的ctl事件将会阻塞了epoll_wait的操作，造成网络处理能力的下降。</p>
+<p>那么，我们能不能设定接收N个的socket消息后再执行一次epoll_ctl，这样可以有效减少epoll_ctl的调用，{active,N}就是这样出现的。</p>
+<footer><strong>没有开花的树</strong><cite><a href="https://blog.csdn.net/mycwq/article/details/24814843" target="_blank" rel="noopener">blog.csdn.net/mycwq/article/details/24814843</a></cite></footer></blockquote>
+<p><code>{reuseaddr, Boolean}</code></p>
+<p>默认是false，一般建议开启，可以复用端口号。同样，这个和系统的设置有关联。</p>
+<p><code>{delay_send, Boolean}</code></p>
+<p>默认值为false。此时发送给socket的数据会立即尝试通过网络投递，若设置为true，则所有消息会在一开始就进入队列，之后才会发送。对于网络使用繁重但实时性要求没那么高的应用情景来说，设置true会节省网络的占用频度。</p>
+<p><code>{nodelay, Boolean}</code></p>
+<p>即便少量数据也立即发送。视应用场景而定，一般对于游戏这种类型的应用而言，设置为true。</p>
+<p><code>{keepalive, Boolean}</code></p>
+<p>默认值为false。设置为true能对一些异常断线的情况进行检测和释放，值得需要注意的是，这个与系统的tcp_keep_alive_time相关。需要将tcp_keep_alive_time设置到一个合理的值。</p>
+<p><code>{send_timeout, Integer}</code> <br><br><code>{send_timeout_close, Boolean}</code></p>
+<p>为timeout设定合适的值，send_timeout_close建议设置为true。</p>
+<p><code>{tos, Integer}</code></p>
+<p>设置IP_TOS参数，这个参数代表了IP包的优先级和QoS选项。和系统的设置有关联。</p>
+</article><!-- lincense--><div class="license-wrapper"><p> <span>Author:  </span><a href="https://hamielhong.github.io">Hamiel Hong</a></p><p> <span>Link:  </span><a href="https://hamielhong.github.io/2019/04/26/erlang-socket-options/">https://hamielhong.github.io/2019/04/26/erlang-socket-options/</a></p><p> <span>Copyright:  </span><span>All articles in this blog are licensed under <a rel="license" href="https://creativecommons.org/licenses/by-nc-nd/3.0">CC BY-NC-SA 3.0</a> unless stating additionally.</span></p></div><div class="post-paginator"><a class="nextSlogan" href="/2019/04/25/erlang-supervisor/" title="erlang-supervisor"><span>NextPost ></span><br><span class="nextTitle">erlang-supervisor</span></a><div class="clear"></div></div><div id="comment"><div id="container"></div><link rel="stylesheet" href="https://imsun.github.io/gitment/style/default.css"><script src="https://imsun.github.io/gitment/dist/gitment.browser.js"></script><script>var gitment = new Gitment({
+  id: 'erlang tcp中的socket参数设置',
+  owner: 'hamielHong',
+  repo: 'hamielhong.github.io',
+  oauth: {
+    client_id: '51ed355b2925b02b6330',
+    client_secret: '3b05555fd89b0bdc097c11b5d588d5985e4fb80f',
+  },
+})
+gitment.render('container')</script></div></section></article><footer id="cxo-footer-outer"><div id="cxo-footer-inner"><p class="footer-container"><span>Site by </span><a href="http://hexo.io"><span>Hexo</span></a><span> | theme </span><a href="https://github.com/Longlongyu/hexo-theme-Cxo"><span>Cxo</span></a></p><i class="fa fa-user"> </i><span id="busuanzi_value_site_uv"></span><span> | </span><i class="fa fa-eye"> </i><span id="busuanzi_value_site_pv"></span></div></footer><!-- catelog--><div class="toc-wrapper" style="top: 70vh;"><div class="toc-catalog"><i class="fa fa-list"> </i><span>CATALOG</span></div></div><!-- top--><i class="fa fa-arrow-up close" id="go-up" aria-hidden="true"></i></body></html>
